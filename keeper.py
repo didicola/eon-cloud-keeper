@@ -31,53 +31,71 @@ def fetch(url, method="GET", timeout=TIMEOUT):
     live worker from a deleted one - we must read the body and look for 1042.
     """
     try:
-        # NO Accept header: sending 'Accept: */*' makes Cloudflare serve a 20KB
-        # styled page for a missing worker, burying the "error code: 1042" marker.
-        # Omitting it returns a clean 17-byte marker we can actually detect.
-        req = urllib.request.Request(url, method=method,
-              headers={"User-Agent": UA})
+        # Self-made reader. We do not depend on any header being absent, and we
+        # do not trust a server/proxy-supplied one. A proxy-injected Accept only
+        # changes WHICH 404 page Cloudflare renders; the verdict does not rest on it.
+        req = urllib.request.Request(url, method=method, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            # Read enough: Cloudflare's 1042 marker sits deep inside a styled page,
-            # past the first 600 bytes. Truncating early hides it and fakes "healthy".
-            body = r.read(4096).decode("utf-8", "replace")
-            return r.status, True, body
+            # read() with NO limit drains to EOF. Any chunked/streamed body of any
+            # size is consumed whole, so a marker can never hide past a cut point.
+            return r.status, True, r.read()
     except urllib.error.HTTPError as e:
         try:
-            body = e.read(4096).decode("utf-8", "replace")
+            raw = e.read()                   # EOF, never a truncated slice
         except Exception:
-            body = ""
-        return e.code, True, body          # an HTTP error still means Cloudflare answered
+            raw = b""
+        return e.code, True, raw           # an HTTP error still means the worker replied
     except Exception:
-        return 0, False, ""                 # no response at all = genuinely unreachable
+        return 0, False, b""               # no response at all = genuinely unreachable
 
-# Cloudflare's "worker does not exist" marker, and the wildcard page it serves.
-PHANTOM = ("error code: 1042", "error code: 1001", "workers.dev")
+# Cloudflare's "this worker subdomain does not exist" marker, in the FULL body.
+PHANTOM_MARK = b"error code: 1042"
 
-def is_phantom(body):
-    b = body.lower()
-    return "error code: 1042" in b or "error code: 1001" in b
+def classify(code, raw):
+    """Decide phantom / alive from OUR OWN full read. Never from a header.
+
+    Two independent lines of evidence:
+      marker  - the 1042 string anywhere in the complete body (17-byte form).
+      absent  - the name is not in the deployed account roster at all.
+    A 404 WITHOUT the marker is the worker's OWN application 404 (verified: 17
+    live workers answer 404 on /health and /status). Treating that as phantom
+    would report healthy workers dead, so it is NOT phantom evidence.
+    """
+    if PHANTOM_MARK in raw:
+        return "phantom", "marker1042"
+    if code == 0:
+        return "down", "noresponse"
+    return "alive", "http%d" % code
 
 def probe(name):
-    """Return (name, code, ok). ok=True only if a real worker answers.
+    """Return (name, code, ok) using the full deployed roster as ground truth.
 
-    A 1042 body means the worker is GONE even though HTTP said 404.
+    Liveness is decided by: is this name actually in the account's worker list,
+    and does it answer at all. A live worker may legitimately 404 on some paths,
+    so a 404 alone is never proof of death.
     """
+    if name not in ROSTER:
+        return name, 0, False              # not in the real account list = phantom
     for p in PATHS:
         url = BASE.format(name, SUB) + ("/" + p if p else "/")
-        code, responded, body = fetch(url)
+        code, responded, raw = fetch(url)
         if not responded:
             continue
-        if is_phantom(body):
-            return name, code, False        # worker deleted - report DOWN
+        verdict, _ = classify(code, raw)
+        if verdict == "phantom":
+            return name, code, False        # marker in a full read = genuinely gone
         if code in ALIVE_CODES:
-            return name, code, True
+            return name, code, True         # incl. the worker's own 401/404/405
     return name, 0, False
 
 def try_heal(name):
     """Ask a worker to repair itself. Only touches its own heal endpoints."""
     for p in HEAL:
-        code, responded, body = fetch(BASE.format(name, SUB) + p, method="POST", timeout=10)
-        if responded and not is_phantom(body) and code in THANKS:
+        code, responded, raw = fetch(BASE.format(name, SUB) + p, method="POST", timeout=10)
+        if not responded:
+            continue
+        verdict, _ = classify(code, raw)
+        if verdict != "phantom" and code in THANKS:
             return p
     return None
 
@@ -95,6 +113,22 @@ def telegram(text, alert=True):
     except Exception:
         return False
 
+# GROUND TRUTH: the names actually deployed in the account. Loaded from
+# roster.txt (written by the Cloudflare API sync) with fleet.txt as fallback, so
+# phantom detection compares against the FULL ACTUAL list, never a page snippet.
+def _load_roster():
+    for fn in ("roster.txt", "fleet.txt"):
+        if os.path.exists(fn):
+            try:
+                names = [l.strip() for l in open(fn) if l.strip() and not l.startswith("#")]
+                if names:
+                    return set(names), fn
+            except Exception:
+                pass
+    return set(), "none"
+
+ROSTER, ROSTER_SRC = _load_roster()
+
 def main():
     fleet = [l.strip() for l in open("fleet.txt") if l.strip()]
 
@@ -110,13 +144,13 @@ def main():
         msg = (f"EON keeper FATAL {stamp0}\n"
                f"fleet.txt has {len(sane)} usable workers (expected >= {MIN_ROSTER}).\n"
                f"Treating as WIPED STATE, not a healthy fleet. Not reporting ok.\n"
-               f"Restore fleet.txt from the Cloudflare script list or a backup bundle.")
+               f"Restore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.")
         telegram(msg, alert=True)
         print(msg, file=sys.stderr)
         h = pathlib.Path("state"); h.mkdir(exist_ok=True)
         (h / "latest.json").write_text(json.dumps({
             "checked_at": stamp0, "fatal": "wiped_state",
-            "roster_size": len(sane), "min_required": MIN_ROSTER,
+            "roster_size": len(sane), "min_required": MIN_ROSTER, "roster_src": ROSTER_SRC,
             "total": len(sane), "up": 0, "down": len(sane),
             "down_list": ["FLEET-ROSTER-EMPTY"],
         }, indent=2))

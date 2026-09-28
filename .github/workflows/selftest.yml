@@ -1,0 +1,30 @@
+name: keeper-selftest
+on:
+  schedule:
+    - cron: "37 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: keeper-selftest
+  cancel-in-progress: false
+jobs:
+  selftest:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Self-test the page-reading and phantom-detection mechanism
+        run: |
+          mkdir -p state
+          TG_TOKEN= TG_CHAT= python3 selftest.py | tee state/selftest.log
+      - name: Commit selftest verdict
+        if: always()
+        run: |
+          git config user.name 'eon-keeper[bot]'
+          git config user.email '41898282+eon-keeper[bot]@users.noreply.github.com'
+          git add -A state || true
+          git commit -m "selftest: $(date -u +%FT%TZ)" || echo "no change"
+          for i in 1 2 3 4 5; do git push && break || sleep 10; done
