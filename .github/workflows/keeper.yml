@@ -3,12 +3,16 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+permissions:
+  contents: write          # required for the state commit to actually push
 jobs:
   keep:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04  # pinned: avoids the Oct 2026 ubuntu-latest -> Ubuntu 26 migration
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
       - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
       - name: Probe fleet, self-heal, report to Telegram
@@ -17,9 +21,14 @@ jobs:
           TG_CHAT: ${{ secrets.TG_CHAT }}
         run: python keeper.py
       - name: Persist state
+        # no '|| true' on push: a silent failure here is how state went missing before
         run: |
-          git config user.name  "eon-keeper"
+          git config user.name  "eon-keeper[bot]"
           git config user.email "keeper@eon.local"
-          git add state || true
-          git diff --staged --quiet || git commit -m "keeper: $(date -u +%FT%TZ) fleet state"
-          git push || true
+          git add state
+          if git diff --staged --quiet; then
+            echo "no change in fleet state"
+          else
+            git commit -m "keeper: $(date -u +%FT%TZ) fleet up/down snapshot"
+            git push
+          fi
