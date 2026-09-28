@@ -1,12 +1,12 @@
 {
-  "checked_at": "2026-09-28T19:53:52Z",
+  "checked_at": "2026-09-28T20:19:34Z",
   "total": 100,
   "up": 100,
   "down": 0,
   "down_list": [],
   "heal_attempts": [],
   "retired_not_in_account": [],
-  "elapsed_s": 1.7,
+  "elapsed_s": 5.2,
   "codes": {
     "ai-proxy": 200,
     "alpha": 200,
