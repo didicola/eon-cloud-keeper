@@ -1,1 +1,3 @@
-state/
+# nothing ignored: state/ must be committed as the health audit trail
+__pycache__/
+*.pyc
