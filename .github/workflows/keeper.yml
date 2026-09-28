@@ -1,13 +1,16 @@
 name: EON Cloud Keeper
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/15 * * * *'          # every 15 min: 96 checks/day, no local device needed
   workflow_dispatch:
 permissions:
-  contents: write          # required for the state commit to actually push
+  contents: write                   # required for the state commit to actually push
+concurrency:
+  group: eon-keeper
+  cancel-in-progress: false         # never let two runs race on the git commit
 jobs:
   keep:
-    runs-on: ubuntu-24.04  # pinned: avoids the Oct 2026 ubuntu-latest -> Ubuntu 26 migration
+    runs-on: ubuntu-24.04           # pinned: avoids ubuntu-latest -> Ubuntu 26 migration
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -15,20 +18,20 @@ jobs:
           persist-credentials: true
       - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
-      - name: Probe fleet, self-heal, report to Telegram
+      - name: Probe 100-worker fleet, self-heal, alert on failure
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
         run: python keeper.py
-      - name: Persist state
-        # no '|| true' on push: a silent failure here is how state went missing before
+      - name: Record health snapshot
+        # No '|| true': a masked push is how fleet state silently went missing before.
         run: |
           git config user.name  "eon-keeper[bot]"
           git config user.email "keeper@eon.local"
           git add state
           if git diff --staged --quiet; then
-            echo "no change in fleet state"
+            echo "fleet unchanged since last check"
           else
-            git commit -m "keeper: $(date -u +%FT%TZ) fleet up/down snapshot"
+            git commit -m "keeper: $(date -u +%FT%TZ) $(python -c "import json;d=json.load(open('state/latest.json'));print('up %d/%d'%(d['up'],d['total']))")"
             git push
           fi

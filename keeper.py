@@ -1,100 +1,145 @@
 #!/usr/bin/env python3
-"""EON cloud keeper - runs on GitHub's cloud, never on a local device.
-Probes the fleet, attempts recovery through the workers' own heal endpoints,
-records state as a git commit, and reports to Telegram. Fully autonomous."""
-import json,os,sys,time,urllib.request,urllib.error,datetime,pathlib
+"""EON cloud keeper - 100% cloud, never on a local device.
 
-SUB = os.environ.get("EON_SUBDOMAIN", "eon-sovereign")
-TG  = os.environ.get("TG_TOKEN", "")
-CHAT= os.environ.get("TG_CHAT", "")
-BASE= f"https://{{}}.{SUB}.workers.dev"
+Probes the full 100-worker fleet, asks downed workers to repair themselves,
+records every check as a git commit (audit trail), and alerts Telegram on
+real failure only. Runs on GitHub's cloud so the phone can stay off.
+"""
+import json, os, sys, time, datetime, pathlib, urllib.request, urllib.error
+import concurrent.futures
 
-SERVICES = [
-    ("eon-p2p-cloud",  "/status",          True),
-    ("eon-mcp",        "/health",          True),
-    ("eon-fleet-hub",  "/",                True),
-    ("eon-hub",        "/",                True),
-    ("eon-fleet-syncer","/",               True),
-    ("eon-neural-web", "/",                True),
-    ("eon-cloud-sentinel","/",             True),
-    ("eon-watchdog-1", "/",                True),
-    ("eon-birth-engine","/",               True),
-    ("eon-auto-deployer","/",              True),
-    ("eon-docker-mcp", "/",                True),
-    ("eon-multi-publisher","/",            True),
-    ("eon-leviathan-agent","/",            True),
-    ("eon-neural-eu",  "/",                True),
-    ("eon-auto-learner","/",               True),
-]
-HEAL_PATHS = ["/heal", "/health", "/repair", "/api/heal"]
+SUB   = os.environ.get("EON_SUBDOMAIN", "eon-sovereign")
+TG    = os.environ.get("TG_TOKEN", "")
+CHAT  = os.environ.get("TG_CHAT", "")
+BASE  = "https://{}.{}.workers.dev"
+UA    = "eon-cloud-keeper/2.0 (+https://eon.local)"
+PATHS = ["health", "status", ""]          # try each until one answers
+HEAL  = ["/heal", "/health", "/repair", "/api/heal", "/"]
+TIMEOUT = 12
+WORKERS = 25                              # parallel probes
 
-UA = "eon-cloud-keeper/1.0 (+https://eon.local)"
+# A worker is ALIVE if the network reaches it and Cloudflare serves *a* status.
+# 401/403/404/405 all prove the worker is running; only 000/5xx mean trouble.
+ALIVE_CODES = set(range(200, 500))       # any real HTTP response from our worker
+THANKS      = {200, 201, 202, 204, 301, 302, 303, 307, 308, 401, 403, 404, 405}
 
-def fetch(url, timeout=12, method="GET"):
+def fetch(url, method="GET", timeout=TIMEOUT):
+    """Return (code, responded, body_snippet).
+
+    Cloudflare serves error 1042 (a styled page) for ANY worker subdomain that
+    does not exist, with HTTP 404. Status code alone therefore CANNOT tell a
+    live worker from a deleted one - we must read the body and look for 1042.
+    """
     try:
-        # Cloudflare returns 403 to default Python-urllib agent; must send a real UA.
-        req = urllib.request.Request(url, method=method, headers={"User-Agent": UA, "Accept": "*/*"})
+        # NO Accept header: sending 'Accept: */*' makes Cloudflare serve a 20KB
+        # styled page for a missing worker, burying the "error code: 1042" marker.
+        # Omitting it returns a clean 17-byte marker we can actually detect.
+        req = urllib.request.Request(url, method=method,
+              headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return {"ok": 200 <= r.status < 400, "status": r.status}
+            # Read enough: Cloudflare's 1042 marker sits deep inside a styled page,
+            # past the first 600 bytes. Truncating early hides it and fakes "healthy".
+            body = r.read(4096).decode("utf-8", "replace")
+            return r.status, True, body
     except urllib.error.HTTPError as e:
-        return {"ok": False, "status": e.code}
-    except Exception as e:
-        return {"ok": False, "status": 0, "err": type(e).__name__}
+        try:
+            body = e.read(4096).decode("utf-8", "replace")
+        except Exception:
+            body = ""
+        return e.code, True, body          # an HTTP error still means Cloudflare answered
+    except Exception:
+        return 0, False, ""                 # no response at all = genuinely unreachable
 
-def probe():
-    out = {}
-    for name, path, _ in SERVICES:
-        out[name] = fetch(BASE.format(name) + path)
-    return out
+# Cloudflare's "worker does not exist" marker, and the wildcard page it serves.
+PHANTOM = ("error code: 1042", "error code: 1001", "workers.dev")
+
+def is_phantom(body):
+    b = body.lower()
+    return "error code: 1042" in b or "error code: 1001" in b
+
+def probe(name):
+    """Return (name, code, ok). ok=True only if a real worker answers.
+
+    A 1042 body means the worker is GONE even though HTTP said 404.
+    """
+    for p in PATHS:
+        url = BASE.format(name, SUB) + ("/" + p if p else "/")
+        code, responded, body = fetch(url)
+        if not responded:
+            continue
+        if is_phantom(body):
+            return name, code, False        # worker deleted - report DOWN
+        if code in ALIVE_CODES:
+            return name, code, True
+    return name, 0, False
 
 def try_heal(name):
-    """Ask a worker to repair itself. Safe: only touches its own heal endpoints."""
-    for p in HEAL_PATHS:
-        r = fetch(BASE.format(name) + p, timeout=10, method="POST")
-        if r["ok"]:
+    """Ask a worker to repair itself. Only touches its own heal endpoints."""
+    for p in HEAL:
+        code, responded, body = fetch(BASE.format(name, SUB) + p, method="POST", timeout=10)
+        if responded and not is_phantom(body) and code in THANKS:
             return p
     return None
 
-def telegram(text):
+def telegram(text, alert=True):
     if not TG or not CHAT:
         return False
-    body = json.dumps({"chat_id": CHAT, "text": text, "disable_notification": True}).encode()
+    body = json.dumps({"chat_id": CHAT, "text": text,
+                       "disable_notification": not alert}).encode()
     try:
         req = urllib.request.Request(
             f"https://api.telegram.org/bot{TG}/sendMessage", data=body,
-            headers={"content-Type": "application/json"}, method="POST")
+            headers={"Content-Type": "application/json"}, method="POST")
         with urllib.request.urlopen(req, timeout=15) as r:
             return json.loads(r.read()).get("ok", False)
     except Exception:
         return False
 
 def main():
-    results = probe()
-    up = [n for n, v in results.items() if v["ok"]]
-    down = [n for n, v in results.items() if not v["ok"]]
-    healed, still_down = [], []
+    fleet = [l.strip() for l in open("fleet.txt") if l.strip()]
+    t0 = time.time()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        results = dict((n, (c, ok)) for n, c, ok in ex.map(probe, fleet))
+
+    up    = sorted(n for n, (c, ok) in results.items() if ok)
+    down  = sorted(n for n, (c, ok) in results.items() if not ok)
+    healed = []
     for n in down:
         p = try_heal(n)
-        (healed if p else still_down).append(n if not p else f"{n} via {p}")
+        if p:
+            healed.append(f"{n} via {p}")
+
+    # Re-probe after any heal attempt, so the recorded state is post-repair truth.
     if healed:
         time.sleep(6)
-        results = probe()
-        still_down = [n for n, v in results.items() if not v["ok"]]
-        up = [n for n, v in results.items() if v["ok"]]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as ex:
+            results = dict((n, (c, ok)) for n, c, ok in ex.map(probe, fleet))
+        up   = sorted(n for n, (c, ok) in results.items() if ok)
+        down = sorted(n for n, (c, ok) in results.items() if not ok)
+
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    report = {"checked_at": stamp, "up": sorted(up), "down": sorted(still_down),
-              "heal_attempts": healed, "total": len(SERVICES)}
+    report = {
+        "checked_at": stamp,
+        "total": len(fleet),
+        "up": len(up), "down": len(down),
+        "down_list": down,
+        "heal_attempts": healed,
+        "elapsed_s": round(time.time() - t0, 1),
+        "codes": {n: c for n, (c, ok) in sorted(results.items())},
+    }
     hist = pathlib.Path("state"); hist.mkdir(exist_ok=True)
     (hist / "latest.json").write_text(json.dumps(report, indent=2))
-    (hist / f"{stamp.replace(':','')}.json").write_text(json.dumps(report, indent=2))
+    (hist / f"{stamp.replace(':', '')}.json").write_text(json.dumps(report, indent=2))
+
     if down:
-        lines = [f"EON keeper {stamp}",
-                 f"up {len(up)}/{len(SERVICES)}"]
+        lines = [f"EON keeper {stamp}", f"up {len(up)}/{len(fleet)}"]
         if healed: lines.append("heal tried: " + ", ".join(healed))
-        if still_down: lines.append("STILL DOWN: " + ", ".join(still_down))
-        telegram("\n".join(lines))
-    print(json.dumps(report, indent=2))
-    return 1 if still_down else 0
+        lines.append("DOWN: " + ", ".join(down))
+        telegram("\n".join(lines), alert=True)
+    print(f"[keeper] {stamp} up {len(up)}/{len(fleet)} down {len(down)} "
+          f"healed {len(healed)} in {report['elapsed_s']}s")
+    if down: print("  DOWN:", ", ".join(down))
+    return 1 if down else 0
 
 if __name__ == "__main__":
     sys.exit(main())
