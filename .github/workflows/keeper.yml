@@ -35,3 +35,4 @@ jobs:
             git commit -m "keeper: $(date -u +%FT%TZ) $(python -c "import json;d=json.load(open('state/latest.json'));print('up %d/%d'%(d['up'],d['total']))")"
             git push
           fi
+
