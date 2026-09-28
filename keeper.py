@@ -117,6 +117,9 @@ def main():
         up   = sorted(n for n, (c, ok) in results.items() if ok)
         down = sorted(n for n, (c, ok) in results.items() if not ok)
 
+    # Roster drift: fleet.txt is a snapshot of what exists. A deleted worker leaves a
+    # phantom 1042 forever unless we surface the difference explicitly.
+    retired = sorted(set(fleet) - set(up))
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     report = {
         "checked_at": stamp,
@@ -124,6 +127,7 @@ def main():
         "up": len(up), "down": len(down),
         "down_list": down,
         "heal_attempts": healed,
+        "retired_not_in_account": retired,
         "elapsed_s": round(time.time() - t0, 1),
         "codes": {n: c for n, (c, ok) in sorted(results.items())},
     }
