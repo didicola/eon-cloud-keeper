@@ -97,6 +97,28 @@ def telegram(text, alert=True):
 
 def main():
     fleet = [l.strip() for l in open("fleet.txt") if l.strip()]
+
+    # T4/E3 GUARD: an empty or implausibly small roster is a WIPED STATE fault, not
+    # a healthy fleet. Never report "up" for a roster we know is incomplete, and
+    # never exit 0 on it -- a silent exit 0 here is exactly the false `ok` the
+    # self-correction bar forbids. Fail loudly and alert instead.
+    MIN_ROSTER = 10
+    if len(fleet) < MIN_ROSTER:
+        stamp0 = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        msg = (f"EON keeper FATAL {stamp0}\n"
+               f"fleet.txt has {len(fleet)} workers (expected >= {MIN_ROSTER}).\n"
+               f"Treating as WIPED STATE, not a healthy fleet. Not reporting ok.\n"
+               f"Restore fleet.txt from the Cloudflare script list or a backup bundle.")
+        telegram(msg, alert=True)
+        print(msg, file=sys.stderr)
+        h = pathlib.Path("state"); h.mkdir(exist_ok=True)
+        (h / "latest.json").write_text(json.dumps({
+            "checked_at": stamp0, "fatal": "wiped_state",
+            "roster_size": len(fleet), "min_required": MIN_ROSTER,
+            "total": len(fleet), "up": 0, "down": len(fleet),
+            "down_list": ["FLEET-ROSTER-EMPTY"],
+        }, indent=2))
+        return 2                       # non-zero: never a false success
     t0 = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as ex:
         results = dict((n, (c, ok)) for n, c, ok in ex.map(probe, fleet))
