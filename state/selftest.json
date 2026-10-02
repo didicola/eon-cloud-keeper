@@ -1,27 +1,27 @@
 {
-  "generated_utc": "2026-10-01T22:52:54Z",
+  "generated_utc": "2026-10-02T06:06:59Z",
   "cases": [
     {
       "case": "deleted worker + injected Accept:*/* header",
       "injected": "Accept: */*",
       "command": "python3 keeper.py",
-      "raw_output": "[keeper] 2026-10-01T22:52:50Z up 5/6 down 1 healed 0 in 0.6s\n  DOWN: zzz-selftest-phantom-dead",
+      "raw_output": "[keeper] 2026-10-02T06:06:56Z up 5/6 down 1 healed 0 in 0.6s\n  DOWN: zzz-selftest-phantom-dead",
       "exit_code": 1,
       "expected_exit": 1,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:50Z",
+      "timestamp_utc": "2026-10-02T06:06:56Z",
       "note": "injected-header page = 19984B, code=404, 1042 marker in FULL body = False; victim detected via roster = True"
     },
     {
       "case": "response larger than first chunk (>4096B)",
       "injected": "none",
       "command": "urllib read-to-EOF",
-      "raw_output": "body=2158B read fully; first-4096 slice would be 2158B",
+      "raw_output": "body=69B read fully; first-4096 slice would be 69B",
       "exit_code": 0,
       "expected_exit": 0,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:50Z",
-      "note": "EOF read length 2158B; marker at byte -1 (verdict never uses a 4096 slice)"
+      "timestamp_utc": "2026-10-02T06:06:56Z",
+      "note": "EOF read length 69B; marker at byte -1 (verdict never uses a 4096 slice)"
     },
     {
       "case": "truncated response (connection cut mid-body)",
@@ -31,73 +31,73 @@
       "exit_code": 0,
       "expected_exit": 0,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:50Z",
+      "timestamp_utc": "2026-10-02T06:06:56Z",
       "note": "partial body is evidence-limited, not a false ok"
     },
     {
       "case": "empty roster file",
       "injected": "<empty>",
       "command": "python3 keeper.py",
-      "raw_output": "EON keeper FATAL 2026-10-01T22:52:50Z\nfleet.txt has 0 usable workers (expected >= 1).\nTreating as WIPED STATE, not a healthy fleet. Not reporting ok.\nRestore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.",
+      "raw_output": "EON keeper FATAL 2026-10-02T06:06:56Z\nfleet.txt has 0 usable workers (expected >= 1).\nTreating as WIPED STATE, not a healthy fleet. Not reporting ok.\nRestore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.",
       "exit_code": 2,
       "expected_exit": 2,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:50Z",
+      "timestamp_utc": "2026-10-02T06:06:56Z",
       "note": "blank roster must be FATAL, never ok"
     },
     {
       "case": "whitespace-only roster file",
       "injected": "\n   \n\t\n",
       "command": "python3 keeper.py",
-      "raw_output": "EON keeper FATAL 2026-10-01T22:52:50Z\nfleet.txt has 0 usable workers (expected >= 1).\nTreating as WIPED STATE, not a healthy fleet. Not reporting ok.\nRestore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.",
+      "raw_output": "EON keeper FATAL 2026-10-02T06:06:56Z\nfleet.txt has 0 usable workers (expected >= 1).\nTreating as WIPED STATE, not a healthy fleet. Not reporting ok.\nRestore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.",
       "exit_code": 2,
       "expected_exit": 2,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:50Z",
+      "timestamp_utc": "2026-10-02T06:06:56Z",
       "note": "blank roster must be FATAL, never ok"
     },
     {
       "case": "comment-only roster file",
       "injected": "# only a comment\n",
       "command": "python3 keeper.py",
-      "raw_output": "EON keeper FATAL 2026-10-01T22:52:50Z\nfleet.txt has 0 usable workers (expected >= 1).\nTreating as WIPED STATE, not a healthy fleet. Not reporting ok.\nRestore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.",
+      "raw_output": "EON keeper FATAL 2026-10-02T06:06:56Z\nfleet.txt has 0 usable workers (expected >= 1).\nTreating as WIPED STATE, not a healthy fleet. Not reporting ok.\nRestore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.",
       "exit_code": 2,
       "expected_exit": 2,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:50Z",
+      "timestamp_utc": "2026-10-02T06:06:56Z",
       "note": "blank roster must be FATAL, never ok"
     },
     {
       "case": "4 real names + 1 fake worker",
       "injected": "none",
       "command": "python3 keeper.py",
-      "raw_output": "[keeper] 2026-10-01T22:52:51Z up 4/5 down 1 healed 0 in 0.7s\n  DOWN: zzz-selftest-phantom-dead",
+      "raw_output": "[keeper] 2026-10-02T06:06:57Z up 4/5 down 1 healed 0 in 0.5s\n  DOWN: zzz-selftest-phantom-dead",
       "exit_code": 1,
       "expected_exit": 1,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:51Z",
+      "timestamp_utc": "2026-10-02T06:06:57Z",
       "note": "phantom must be caught, exit 1"
     },
     {
       "case": "5 real workers",
       "injected": "none",
       "command": "python3 keeper.py",
-      "raw_output": "[keeper] 2026-10-01T22:52:51Z up 5/5 down 0 healed 0 in 0.2s",
+      "raw_output": "[keeper] 2026-10-02T06:06:57Z up 5/5 down 0 healed 0 in 0.1s",
       "exit_code": 0,
       "expected_exit": 0,
       "verdict": "PASS",
-      "timestamp_utc": "2026-10-01T22:52:51Z",
+      "timestamp_utc": "2026-10-02T06:06:57Z",
       "note": "small legit fleet must pass, exit 0"
     },
     {
       "case": "all 100 real workers",
       "injected": "none",
       "command": "python3 keeper.py",
-      "raw_output": "[keeper] 2026-10-01T22:52:54Z up 95/100 down 5 healed 0 in 3.0s\n  DOWN: eon-cloud-sentinel, eon-crypto-blog, eon-distro, eon-distros-15, eon-landing",
+      "raw_output": "[keeper] 2026-10-02T06:06:59Z up 95/100 down 5 healed 0 in 2.6s\n  DOWN: eon-cloud-sentinel, eon-crypto-blog, eon-distro, eon-distros-15, eon-landing",
       "exit_code": 1,
       "expected_exit": 0,
       "verdict": "FAIL",
-      "timestamp_utc": "2026-10-01T22:52:54Z",
+      "timestamp_utc": "2026-10-02T06:06:59Z",
       "note": "full roster must pass, exit 0"
     }
   ],
