@@ -1,3 +1,4 @@
+agi-arc3-epb-evaluator
 ai-proxy
 alpha
 api-anthropic
@@ -27,18 +28,15 @@ container-runtime-v2
 distros
 eon-ai
 eon-ai-chat
+eon-android-bridge
 eon-auto-deployer
 eon-auto-learner
 eon-birth-engine
 eon-cloud-backup-alpha
 eon-cloud-backup-bravo
-eon-cloud-sentinel
-eon-crypto-blog
 eon-dark-matter
-eon-distro
-eon-distros
-eon-distros-15
 eon-docker-mcp
+eon-e2b-alternative
 eon-earth-gate
 eon-edge-ai
 eon-edge-brain
@@ -48,9 +46,9 @@ eon-edge-services
 eon-fleet-hub
 eon-fleet-hub-v3
 eon-fleet-syncer
+eon-health-monitor
 eon-hub
 eon-lab
-eon-landing
 eon-learn-all
 eon-leviathan-agent
 eon-live-learner-edge
@@ -58,6 +56,7 @@ eon-matrix-keeper
 eon-mcp
 eon-memory
 eon-mghost-1
+eon-mghost-2
 eon-multi-cdn
 eon-multi-publisher
 eon-neural-eu
@@ -66,10 +65,12 @@ eon-neural-web
 eon-openai-relay
 eon-p2p-cloud
 eon-pow-shard
+eon-skill-mesh
 eon-sovereign-core
 eon-sync-round
 eon-termux-mcp
 eon-trig-matrix
+eon-ubuntu-alternative
 eon-vram
 eon-watchdog-1
 eon-watchdog-3
@@ -78,7 +79,6 @@ ghost
 ghost-2
 ghost-3
 ghost-4
-ghost-alpha
 ghost-dashboard
 ghost-store
 ghost-swarm
