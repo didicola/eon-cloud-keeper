@@ -2,78 +2,76 @@
 EON CLOUD KEEPER SELF-TEST (runs in cloud; local is only a terminal)
 Mechanism: read-to-EOF, no trusted external header, full-roster truth
 ==========================================================================
-[2026-10-09T06:38:09Z] PASS | deleted worker + injected Accept:*/* header
+[2026-10-09T18:29:29Z] PASS | deleted worker + injected Accept:*/* header
         injected : Accept: */*
         command  : python3 keeper.py
-        raw      : [keeper] 2026-10-09T06:38:09Z up 5/6 down 1 healed 0 in 0.7s
+        raw      : [keeper] 2026-10-09T18:29:29Z up 5/6 down 1 healed 0 in 1.4s
   DOWN: zzz-selftest-phantom-dead
         exit     : 1 (expected 1)
         note     : injected-header page = 19984B, code=404, 1042 marker in FULL body = False; victim detected via roster = True
-[2026-10-09T06:38:10Z] PASS | response larger than first chunk (>4096B)
+[2026-10-09T18:29:29Z] PASS | response larger than first chunk (>4096B)
         injected : none
         command  : urllib read-to-EOF
-        raw      : body=996B read fully; first-4096 slice would be 996B
+        raw      : body=8889B read fully; first-4096 slice would be 4096B
         exit     : 0 (expected 0)
-        note     : EOF read length 996B; marker at byte -1 (verdict never uses a 4096 slice)
-[2026-10-09T06:38:10Z] PASS | truncated response (connection cut mid-body)
+        note     : EOF read length 8889B; marker at byte -1 (verdict never uses a 4096 slice)
+[2026-10-09T18:29:29Z] PASS | truncated response (connection cut mid-body)
         injected : none
         command  : synthetic: fetch() with a body that ends early
         raw      : classified as noresponse, not as verified-alive; keeper never reports ok on an unproven body
         exit     : 0 (expected 0)
         note     : partial body is evidence-limited, not a false ok
-[2026-10-09T06:38:10Z] PASS | empty roster file
+[2026-10-09T18:29:29Z] PASS | empty roster file
         injected : <empty>
         command  : python3 keeper.py
-        raw      : EON keeper FATAL 2026-10-09T06:38:10Z
+        raw      : EON keeper FATAL 2026-10-09T18:29:29Z
 fleet.txt has 0 usable workers (expected >= 1).
 Treating as WIPED STATE, not a healthy fleet. Not reporting ok.
 Restore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.
         exit     : 2 (expected 2)
         note     : blank roster must be FATAL, never ok
-[2026-10-09T06:38:10Z] PASS | whitespace-only roster file
+[2026-10-09T18:29:30Z] PASS | whitespace-only roster file
         injected : 
    
 	
 
         command  : python3 keeper.py
-        raw      : EON keeper FATAL 2026-10-09T06:38:10Z
+        raw      : EON keeper FATAL 2026-10-09T18:29:29Z
 fleet.txt has 0 usable workers (expected >= 1).
 Treating as WIPED STATE, not a healthy fleet. Not reporting ok.
 Restore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.
         exit     : 2 (expected 2)
         note     : blank roster must be FATAL, never ok
-[2026-10-09T06:38:10Z] PASS | comment-only roster file
+[2026-10-09T18:29:30Z] PASS | comment-only roster file
         injected : # only a comment
 
         command  : python3 keeper.py
-        raw      : EON keeper FATAL 2026-10-09T06:38:10Z
+        raw      : EON keeper FATAL 2026-10-09T18:29:30Z
 fleet.txt has 0 usable workers (expected >= 1).
 Treating as WIPED STATE, not a healthy fleet. Not reporting ok.
 Restore fleet.txt/roster.txt from the Cloudflare script list or a backup bundle.
         exit     : 2 (expected 2)
         note     : blank roster must be FATAL, never ok
-[2026-10-09T06:38:11Z] PASS | 4 real names + 1 fake worker
+[2026-10-09T18:29:31Z] PASS | 4 real names + 1 fake worker
         injected : none
         command  : python3 keeper.py
-        raw      : [keeper] 2026-10-09T06:38:11Z up 4/5 down 1 healed 0 in 0.6s
+        raw      : [keeper] 2026-10-09T18:29:31Z up 4/5 down 1 healed 0 in 1.0s
   DOWN: zzz-selftest-phantom-dead
         exit     : 1 (expected 1)
         note     : phantom must be caught, exit 1
-[2026-10-09T06:38:11Z] PASS | 5 real workers
+[2026-10-09T18:29:31Z] PASS | 5 real workers
         injected : none
         command  : python3 keeper.py
-        raw      : [keeper] 2026-10-09T06:38:11Z up 5/5 down 0 healed 0 in 0.3s
+        raw      : [keeper] 2026-10-09T18:29:31Z up 5/5 down 0 healed 0 in 0.4s
         exit     : 0 (expected 0)
         note     : small legit fleet must pass, exit 0
-[2026-10-09T06:38:14Z] FAIL | all 100 real workers
+[2026-10-09T18:29:33Z] PASS | all 100 real workers
         injected : none
         command  : python3 keeper.py
-        raw      : [keeper] 2026-10-09T06:38:14Z up 95/100 down 5 healed 0 in 3.4s
-  DOWN: eon-cloud-sentinel, eon-crypto-blog, eon-distro, eon-distros-15, eon-landing
-        exit     : 1 (expected 0)
+        raw      : [keeper] 2026-10-09T18:29:33Z up 100/100 down 0 healed 0 in 1.4s
+        exit     : 0 (expected 0)
         note     : full roster must pass, exit 0
 --------------------------------------------------------------------------
-cases=9  passed=8  failed=1
-  FAILED: all 100 real workers exit=1 expected=0
+cases=9  passed=9  failed=0
 T4 VERDICT: NOT PASSED (owner-sealed run required)
 ==========================================================================
