@@ -62,7 +62,14 @@ def classify(code, raw):
     would report healthy workers dead, so it is NOT phantom evidence.
     """
     if PHANTOM_MARK in raw:
-        return "phantom", "marker1042"
+        # Genuine edge 404 = marker AS THE WHOLE BODY (~17 bytes, strip-equal).
+        # A live worker may QUOTE an error page inside its own healthy JSON
+        # (seen 2026-10-09: eon-android-bridge / returns 200 with
+        # tunnel_status.body="error code: 1042") — that must NOT be phantom,
+        # or it short-circuits probe() before the other PATHS are tried.
+        if raw.strip() == PHANTOM_MARK:
+            return "phantom", "marker1042"
+        return "alive", "http%d" % code
     if code == 0:
         return "down", "noresponse"
     return "alive", "http%d" % code
