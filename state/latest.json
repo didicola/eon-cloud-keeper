@@ -1,12 +1,12 @@
 {
-  "checked_at": "2026-10-28T11:37:38Z",
+  "checked_at": "2026-10-28T17:21:58Z",
   "total": 100,
   "up": 100,
   "down": 0,
   "down_list": [],
   "heal_attempts": [],
   "retired_not_in_account": [],
-  "elapsed_s": 12.9,
+  "elapsed_s": 1.2,
   "codes": {
     "agi-arc3-epb-evaluator": 200,
     "agi-loop": 200,
@@ -24,7 +24,7 @@
     "api-telegram-eon": 200,
     "api-togeth-ai": 200,
     "artifact-agent": 404,
-    "auto-heal": 200,
+    "auto-heal": 404,
     "cloud-brain": 200,
     "cloud-db": 404,
     "cloud-dns": 404,
